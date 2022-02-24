@@ -8,6 +8,9 @@ import os
 from app import app
 from flask import render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.utils import secure_filename
+from app.forms import UploadForm
+from flask.helpers import send_from_directory
+
 
 
 ###
@@ -23,7 +26,7 @@ def home():
 @app.route('/about/')
 def about():
     """Render the website's about page."""
-    return render_template('about.html', name="Mary Jane")
+    return render_template('about.html', name="Rene Tim")
 
 
 @app.route('/upload', methods=['POST', 'GET'])
@@ -32,15 +35,41 @@ def upload():
         abort(401)
 
     # Instantiate your form class
+    formObj=UploadForm()
+    if request.method == "GET":
+        return render_template('upload.html', form=formObj)
 
     # Validate file upload on submit
-    if request.method == 'POST':
+    if request.method == 'POST' and formObj.validate_on_submit():
+
         # Get file data and save to your uploads folder
+        image=request.files["image"]
+        filenameSecure=secure_filename(image.filename)
+        if (filenameSecure and image != ""):
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filenameSecure))
+            flash('File Saved Successfully', 'success')
+            return redirect(url_for('home'))
+    return render_template('upload.html', form=formObj)
 
-        flash('File Saved', 'success')
-        return redirect(url_for('home'))
+def get_uploaded_images():
+    rootdir = os.getcwd()
+    images=[]
+    for subdir, dirs, files in os.walk(rootdir + app.config['UPLOAD_FOLDER'][1:]):
+        for file in files:
+            images.append(file)
+    return images
 
-    return render_template('upload.html')
+@app.route('/uploads/<filename>')
+def get_image(filename):
+    return send_from_directory(os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER']),filename)
+
+@app.route('/files', methods=["GET", "POST"])
+def files():
+    if not session.get('logged_in'):
+        abort(401)
+    if request.method == "GET":
+        uploadedImages=get_uploaded_images()
+        return render_template('files.html',uploadsImg=uploadedImages)
 
 
 @app.route('/login', methods=['POST', 'GET'])
